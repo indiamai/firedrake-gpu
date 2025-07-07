@@ -7,15 +7,18 @@ from FIAT import make_quadrature
 from finat.element_factory import as_fiat_cell
 
 
-mesh = UnitSquareMesh(10,10)
+mesh = UnitSquareMesh(20, 20)
 cg2_space = FunctionSpace(mesh, "CG", 2)
 cg3_space = FunctionSpace(mesh, "CG", 3)
 
 # Checking our work
 v = TestFunction(cg2_space)
 u = TrialFunction(cg3_space)
+f = Function(cg3_space)
+f.assign(0.5)
 form = dot(grad(v),grad(u))*dx
-form_a = assemble(form)
+form_a = assemble(action(form,f))
+expected_val = form_a.dat.data
 
 v = Function(cg2_space)
 u = Function(cg3_space)
@@ -37,19 +40,20 @@ coord_node_map = coordinate_space.cell_node_list
 np.savez("firedrake_laplace_data.npz", coords=coordinates, coords_map=coord_node_map, 
                                grad_basis_cg2=derivs_cg2, grad_basis_cg3=derivs_cg3, grad_basis=derivs,
                                empty_data=np.outer(v.dat.data_ro,u.dat.data_ro), weights=weights,
-                               cg2_map=cg2_node_map, cg3_map=cg3_node_map, expected=form_a.M.values)
+                               cg2_map=cg2_node_map, cg3_map=cg3_node_map, f=f.dat.data, expected=expected_val)
 
 data = np.load("firedrake_laplace_data.npz")
 
-derivs_gpu = cp.asarray(data["grad_basis"], dtype=cp.float32)
-derivs_cg2_gpu = cp.asarray(data["grad_basis_cg2"], dtype=cp.float32)
-derivs_cg3_gpu = cp.asarray(data["grad_basis_cg3"], dtype=cp.float32)
+derivs_gpu = cp.asarray(data["grad_basis"], dtype=cp.float64)
+derivs_cg2_gpu = cp.asarray(data["grad_basis_cg2"], dtype=cp.float64)
+derivs_cg3_gpu = cp.asarray(data["grad_basis_cg3"], dtype=cp.float64)
 cg2_node_map_gpu = cp.asarray(data["cg2_map"])
 cg3_node_map_gpu = cp.asarray(data["cg3_map"])
 cg_data_gpu = cp.empty_like(data["empty_data"])
 coord_node_map_gpu = cp.asarray(data["coords_map"])
-coord_data_gpu = cp.asarray(data["coords"], dtype=cp.float32)
-weights_gpu = cp.asarray(data["weights"])
+coord_data_gpu = cp.asarray(data["coords"], dtype=cp.float64)
+weights_gpu = cp.asarray(data["weights"], dtype=cp.float64)
+f_gpu = cp.asarray(data["f"], dtype=cp.float64)
 
 
 # Do all cells in one set of instructions
@@ -64,15 +68,17 @@ grad_u = cp.einsum("lmij,kmi->lmkj", JT, derivs_cg3_gpu)
 basis_funcs_gpu = cp.einsum("cqkd, cqbd-> cqkb", grad_v, grad_u)
 det_jacobians = cp.fabs(cp.linalg.det(jacobians))
 contracted = cp.einsum("ij,ijkm,j->ikm", det_jacobians, basis_funcs_gpu, weights_gpu)
+
+# these should be sparse matrix insertions
 for c in range(len(cg2_node_map_gpu)):
     map = cp.ix_(cg2_node_map_gpu[c], cg3_node_map_gpu[c])
     cpx.scatter_add(cg_data_gpu, map, contracted[c])
+result = cp.matmul(cg_data_gpu, f_gpu)
+
+output = result.get()
 
 
-output = cg_data_gpu.get()
-
-
-#print("GPU:", output)
-#print("Firedrake:", data["expected"])
-assert(np.allclose(data["expected"], output, atol=1e-6))
+print("GPU:", output)
+print("Firedrake:", data["expected"])
+assert(np.allclose(data["expected"], output))
 print("Success")

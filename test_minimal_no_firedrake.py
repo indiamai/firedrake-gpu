@@ -5,12 +5,12 @@ import numpy as np
 
 # Code not dependent on firedrake (with data file)
 data = np.load("firedrake_data.npz")
-derivs_gpu = cp.asarray(data["grad_basis"], dtype=cp.float32)
+derivs_gpu = cp.asarray(data["grad_basis"], dtype=cp.float64)
 basis_funcs_gpu = cp.asarray(data["basis"])
 cg_node_map_gpu = cp.asarray(data["cg_map"])
 cg_data_gpu = cp.empty_like(data["empty_data"])
 coord_node_map_gpu = cp.asarray(data["coords_map"])
-coord_data_gpu = cp.asarray(data["coords"], dtype=cp.float32)
+coord_data_gpu = cp.asarray(data["coords"], dtype=cp.float64)
 weights_gpu = cp.asarray(data["weights"])
 
 
