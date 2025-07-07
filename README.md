@@ -5,5 +5,6 @@ Minimal examples of the desired firedrake operations.
 
 `test_laplace.py` assembles $`\int \nabla v \cdot \nabla u \text{ d}x`$, expressed in UFL as `dot(grad(v), grad(u)) * dx`. This is a 2-form and an example of the further forms we will be assembling. A detailed explanation of this form can be found in section 3.2 of [this paper](https://epubs.siam.org/doi/10.1137/17M1130642). It is assembled over two different finite element spaces - one for `u` and one for `v`. Note that the action of this 2-form against a fixed vector is used for checking - this is to avoid storing large matrices.
 
+`test_coefficients.py` assembles $`\int (f + g)v \text{ d}x`$, expressed in UFL as ` (f + g) * v dx`. `f`, `g` and `v` are all expressed in different finite element spaces. This demonstrates the use of coefficients.
 
 Along with the full scripts, there are also `*_no_firedrake.py` versions, which can be run without Firedrake installed, so long as the corresponding data files are accessible.
