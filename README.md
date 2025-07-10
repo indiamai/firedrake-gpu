@@ -8,3 +8,5 @@ Minimal examples of the desired firedrake operations.
 `test_coefficients.py` assembles $`\int (f + g)v \text{ d}x`$, expressed in UFL as ` (f + g) * v dx`. `f`, `g` and `v` are all expressed in different finite element spaces. This demonstrates the use of coefficients.
 
 Along with the full scripts, there are also `*_no_firedrake.py` versions, which can be run without Firedrake installed, so long as the corresponding data files are accessible.
+
+`stream_mfe.py` notes the issues encountered using streams and einsums together.
