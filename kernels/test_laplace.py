@@ -41,7 +41,7 @@ import numpy as np
 #                               empty_data=v.dat.data_ro, cg2_map=cg2_node_map,
 #                               cg3_map=cg3_node_map, f=f.dat.data, expected=expected_val)
 
-data = np.load("firedrake_laplace_data.npz")
+data = np.load("laplace_data.npz")
 from temp_kernel_laplace import cupy_kernel0 as cupy_kernel 
 
 cg2_node_map_gpu = cp.asarray(data["cg2_map"])
