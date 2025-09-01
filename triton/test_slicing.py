@@ -35,6 +35,33 @@ def _take_slice_(x, n_dims: tl.constexpr, idx: tl.constexpr, pos: tl.constexpr, 
     return y
 
 @triton.jit
+def _split_indicator_(n_dims: tl.constexpr, idx: tl.constexpr, stride: tl.constexpr, pos_dim: tl.constexpr, off: tl.constexpr, end_size:tl.constexpr):
+    tl.static_assert(idx < n_dims)
+    tl.static_assert(off < pos_dim)
+    y = tl.arange(0, pos_dim)
+    y = tl.where(y%stride==off, y, 0)
+    count = tl.sum(tl.where(y!=0, 1, 0), 0)
+    y = tl.sort(y)
+    
+    for n in tl.static_range(0, n_dims):
+        if n != n_dims - 1 - idx:
+            y = tl.expand_dims(y, n)
+    return y
+
+@triton.jit
+def _take_split_slice_(x, n_dims: tl.constexpr, idx: tl.constexpr, stride: tl.constexpr, pos_dim:tl.constexpr, off:tl.constexpr, end_size:tl.constexpr, keep_dim: tl.constexpr = True):
+    ind = _split_indicator_(n_dims, idx, stride, pos_dim, off, end_size)
+    breakpoint()
+    y = tl.gather(x, ind, n_dims - 1 - idx)
+    # need to check that end_size is power of two - here or in generation?
+    y = tl.trans(y.reshape(2, end_size, x.shape[1:]))
+    y = tl.split(y)[1]
+    if keep_dim:
+        y = tl.expand_dims(y, n_dims - 1 - idx)
+
+    return y
+
+@triton.jit
 def _put_slice_(x, n_dims: tl.constexpr, idx: tl.constexpr, pos: tl.constexpr, pos_dim:tl.constexpr, input_slice):
     ind = _indicator_(n_dims, idx, pos, pos_dim)
     y = tl.where(ind==1, input_slice, x)
@@ -61,6 +88,8 @@ def add_kernel(cell_coords,
     offsets =  cell_offsets[:, None]*stride_coords_c + sub_offsets[None, :]*stride_coords_d 
     mask = offsets < (cell_offsets * stride_coords_c + coords_size)[:, None] 
     coord_cells = tl.load(cell_coords + offsets, mask=mask, other=0)
+    c = _take_split_slice_(coord_cells, len(coord_cells.shape), 0, 2, coord_cells.shape[1],1, 4)
+    breakpoint()
     coords0 = _take_slice_(coord_cells, len(coord_cells.shape), 0, 0, coord_cells.shape[1]).reshape(coord_cells.shape[0])
     coord_0 = _take_slice_(coord_cells, len(coord_cells.shape), 0, 0, coord_cells.shape[1]).reshape(coord_cells.shape[0])
     coord_1 = _take_slice_(coord_cells, BLOCK_SIZE_C, 0, 1, coords_d).reshape(BLOCK_SIZE_C)
